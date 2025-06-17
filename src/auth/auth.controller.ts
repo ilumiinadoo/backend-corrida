@@ -23,6 +23,6 @@ export class AuthController {
   @UseGuards(AuthGuard('google'))
   async googleRedirect(@Req() req, @Res() res: Response) {
     const token = this.authService.loginSocial(req.user);
-    res.redirect(`http://localhost:5173/login/callback?token=${token}`);
+    res.redirect(`https://frontend-corrida.vercel.app/login/callback?token=${token}`);
   }
 }

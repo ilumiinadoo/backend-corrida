@@ -10,7 +10,7 @@ async function bootstrap() {
   useContainer(app.select(AppModule), { fallbackOnErrors: true });
 
   app.enableCors({
-    origin: 'http://localhost:5173', // permite o frontend
+    origin: '*', // Liberar para qualquer origem (mais fácil pra apresentação)
     credentials: true,
   });
 
