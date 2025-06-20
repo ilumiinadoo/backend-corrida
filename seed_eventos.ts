@@ -1,7 +1,11 @@
+import * as dotenv from 'dotenv';
+dotenv.config({ path: '.env.seeding' });
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './src/app.module';
 import { getModelToken } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import mongoose from 'mongoose';
 import { Group } from './src/groups/group.schema';
 import { Route } from './src/routes/route.schema';
 import { Event } from './src/events/event.schema';
@@ -19,16 +23,8 @@ async function bootstrap() {
   const grupos = await groupModel.find();
   const statusPossiveis: ('confirmed' | 'maybe' | 'declined')[] = ['confirmed', 'maybe', 'declined'];
   const nomesEventos = [
-    'Treino Especial',
-    'Longão de Sábado',
-    'Desafio 5k',
-    'Corrida do Bairro',
-    'Encontro de Confraternização',
-    'Treino Técnico',
-    'Desafio Noturno',
-    'Treino de Subida',
-    'Corrida Solidária',
-    'Treino Intervalado',
+    'Treino Especial', 'Longão de Sábado', 'Desafio 5k', 'Corrida do Bairro', 'Encontro de Confraternização',
+    'Treino Técnico', 'Desafio Noturno', 'Treino de Subida', 'Corrida Solidária', 'Treino Intervalado',
   ];
 
   for (const grupo of grupos) {
@@ -68,6 +64,7 @@ async function bootstrap() {
 
   console.log('✅ Seed de eventos finalizado!');
   await app.close();
+  await mongoose.disconnect();
 }
 
 bootstrap();

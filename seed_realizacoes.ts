@@ -1,7 +1,11 @@
+import * as dotenv from 'dotenv';
+dotenv.config({ path: '.env.seeding' });
+
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './src/app.module';
 import { getModelToken } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
+import mongoose from 'mongoose';
 import { Group } from './src/groups/group.schema';
 import { Route } from './src/routes/route.schema';
 import { Accomplishment } from './src/accomplishments/accomplishment.schema';
@@ -55,6 +59,7 @@ async function bootstrap() {
 
   console.log('✅ Seed de accomplishments finalizado!');
   await app.close();
+  await mongoose.disconnect();
 }
 
 bootstrap();

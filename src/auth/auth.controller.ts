@@ -2,10 +2,14 @@ import { Controller, Post, Get, Body, UseGuards, Req, Res } from '@nestjs/common
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { Response } from 'express';
+import { ConfigService } from '@nestjs/config';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Post('login')
   async login(@Body() body: { email: string; senha: string }) {
@@ -16,13 +20,14 @@ export class AuthController {
   @Get('google')
   @UseGuards(AuthGuard('google'))
   async googleLogin() {
-    // redireciona para o Google
+    // Apenas redireciona via Passport
   }
 
   @Get('google/redirect')
   @UseGuards(AuthGuard('google'))
   async googleRedirect(@Req() req, @Res() res: Response) {
     const token = this.authService.loginSocial(req.user);
-    res.redirect(`https://frontend-corrida.vercel.app/login/callback?token=${token}`);
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+    res.redirect(`${frontendUrl}/login/callback?token=${token}`);
   }
 }

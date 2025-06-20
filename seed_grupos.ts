@@ -1,19 +1,30 @@
-import { NestFactory } from '@nestjs/core'
-import { AppModule } from './src/app.module'
-import { getModelToken } from '@nestjs/mongoose'
-import { Model } from 'mongoose'
-import { User } from './src/users/user.schema'
-import { Group } from './src/groups/group.schema'
+import * as dotenv from 'dotenv';
+dotenv.config({ path: '.env.seeding' });
+
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './src/app.module';
+import { getModelToken } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import mongoose from 'mongoose';
+import { User } from './src/users/user.schema';
+import { Group } from './src/groups/group.schema';
 
 async function bootstrap() {
-  const app = await NestFactory.createApplicationContext(AppModule)
+  const app = await NestFactory.createApplicationContext(AppModule);
 
-  const userModel = app.get<Model<User>>(getModelToken('User'))
-  const groupModel = app.get<Model<Group>>(getModelToken('Group'))
+  const userModel = app.get<Model<User>>(getModelToken('User'));
+  const groupModel = app.get<Model<Group>>(getModelToken('Group'));
 
-  await groupModel.deleteMany({})
+  await groupModel.deleteMany({});
 
-  const usuarios = await userModel.find().lean()
+  const usuarios = await userModel.find().lean();
+
+  if (usuarios.length < 15) {
+    console.error('❌ Não há usuários suficientes no banco para criar os grupos. Execute o seed de usuários primeiro.');
+    await app.close();
+    await mongoose.disconnect();
+    process.exit(1);
+  }
 
   const gruposInfo = [
     {
@@ -31,11 +42,10 @@ async function bootstrap() {
       descricao: 'Explorando trilhas urbanas pela cidade',
       usuarios: usuarios.slice(10, 15), // usuario11 ao usuario15
     },
-  ]
+  ];
 
-  for (let i = 0; i < gruposInfo.length; i++) {
-    const grupo = gruposInfo[i]
-    const admin = grupo.usuarios[0]
+  for (const grupo of gruposInfo) {
+    const admin = grupo.usuarios[0];
 
     await groupModel.create({
       nome: grupo.nome,
@@ -43,13 +53,14 @@ async function bootstrap() {
       criadorId: admin._id,
       administradores: [admin._id],
       membros: grupo.usuarios.map((u) => u._id),
-    })
+    });
 
-    console.log(`✅ Grupo "${grupo.nome}" criado com ${grupo.usuarios.length} membros.`)
+    console.log(`✅ Grupo "${grupo.nome}" criado com ${grupo.usuarios.length} membros.`);
   }
 
-  console.log('✅ Seed de grupos finalizado.')
-  await app.close()
+  console.log('✅ Seed de grupos finalizado.');
+  await app.close();
+  await mongoose.disconnect();
 }
 
-bootstrap()
+bootstrap();
