@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException } from '@nestjs/common'
+import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common'
 import { InjectModel } from '@nestjs/mongoose'
 import { Model } from 'mongoose'
 import { Group } from './group.schema'
@@ -6,7 +6,6 @@ import { User } from '../users/user.schema';
 import { Activity } from '../activities/activity.schema'
 import { Route } from '../routes/route.schema';
 import { Accomplishment } from '../accomplishments/accomplishment.schema';
-import { NotFoundException } from '@nestjs/common'
 
 @Injectable()
 export class GroupService {
@@ -125,5 +124,34 @@ export class GroupService {
     }
     return { message: 'Grupo excluído com sucesso' };
   }
+
+  async removeMember(groupId: string, userId: string, requesterId: string) {
+    const grupo = await this.model.findById(groupId);
+
+    if (!grupo) throw new NotFoundException('Grupo não encontrado');
+
+    // Só admins podem remover
+    const isRequesterAdmin = grupo.administradores.includes(requesterId);
+    if (!isRequesterAdmin) {
+      throw new ForbiddenException('Apenas administradores podem remover membros.');
+    }
+
+    // Não pode remover alguém que não está no grupo
+    const isMember = grupo.membros.includes(userId);
+    if (!isMember) {
+      throw new BadRequestException('Usuário não faz parte do grupo.');
+    }
+
+    // Remove da lista de membros
+    grupo.membros = grupo.membros.filter((id) => id.toString() !== userId);
+
+    // Se por acaso for admin também, remove da lista de admins
+    grupo.administradores = grupo.administradores.filter((id) => id.toString() !== userId);
+
+    await grupo.save();
+
+    return { message: 'Membro removido com sucesso.' };
+  }
+
 
 }

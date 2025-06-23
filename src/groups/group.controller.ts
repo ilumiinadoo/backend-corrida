@@ -56,4 +56,16 @@ export class GroupController {
   async deleteGroup(@Param('id') id: string) {
     return this.service.deleteGroup(id);
   }
+
+  @Patch(':groupId/remove-member/:userId')
+  @UseGuards(JwtAuthGuard)
+  async removeMember(
+    @Param('groupId') groupId: string,
+    @Param('userId') userId: string,
+    @Request() req,
+  ) {
+    const requesterId = req.user.userId; // Usuário que está fazendo a requisição
+    return this.service.removeMember(groupId, userId, requesterId);
+  }
+
 }
