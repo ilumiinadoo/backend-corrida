@@ -1,9 +1,9 @@
-import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common'
-import { InjectModel } from '@nestjs/mongoose'
-import { Model } from 'mongoose'
-import { Group } from './group.schema'
+import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { Group } from './group.schema';
 import { User } from '../users/user.schema';
-import { Activity } from '../activities/activity.schema'
+import { Activity } from '../activities/activity.schema';
 import { Route } from '../routes/route.schema';
 import { Accomplishment } from '../accomplishments/accomplishment.schema';
 
@@ -11,67 +11,143 @@ import { Accomplishment } from '../accomplishments/accomplishment.schema';
 export class GroupService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
-    @InjectModel(Group.name) private model: Model<Group>,
+    @InjectModel(Group.name) private groupModel: Model<Group>,
     @InjectModel(Activity.name) private activityModel: Model<Activity>,
     @InjectModel(Accomplishment.name) private accomplishmentModel: Model<Accomplishment>,
     @InjectModel(Route.name) private routeModel: Model<Route>,
   ) {}
 
+  // ========= CRUD de Grupos =========
+
   async create(userId: string, dto: { nome: string; descricao?: string }) {
-    return this.model.create({
+    return this.groupModel.create({
       ...dto,
       criadorId: userId,
       administradores: [userId],
       membros: [userId],
-    })
+    });
   }
 
   async listAll() {
-    return this.model.find()
-  }
-
-  async requestJoin(groupId: string, userId: string) {
-    const group = await this.model.findById(groupId)
-    if (!group) throw new Error('Grupo não encontrado')
-    if (group.membros.includes(userId) || group.pendentes.includes(userId)) return group
-    group.pendentes.push(userId)
-    return group.save()
-  }
-
-  async approveMember(groupId: string, userId: string, approverId: string) {
-    const group = await this.model.findById(groupId)
-    if (!group) throw new NotFoundException('Grupo não encontrado')
-    if (!group.administradores.includes(approverId)) throw new ForbiddenException()
-    group.pendentes = group.pendentes.filter((id) => id !== userId)
-    group.membros.push(userId)
-    return group.save()
-  }
-
-  async promoteToAdmin(groupId: string, targetId: string, requesterId: string) {
-    const group = await this.model.findById(groupId)
-    if (!group) throw new NotFoundException('Grupo não encontrado')
-    if (!group.administradores.includes(requesterId)) throw new ForbiddenException()
-    if (!group.membros.includes(targetId)) throw new Error('Usuário não faz parte do grupo')
-    if (!group.administradores.includes(targetId)) group.administradores.push(targetId)
-    return group.save()
+    return this.groupModel.find();
   }
 
   async findById(id: string) {
-    return this.model.findById(id)
+    return this.groupModel.findById(id);
   }
 
+  async deleteGroup(id: string): Promise<{ message: string }> {
+    const result = await this.groupModel.findByIdAndDelete(id);
+    if (!result) throw new NotFoundException('Grupo não encontrado');
+    return { message: 'Grupo excluído com sucesso.' };
+  }
+
+  async findByAdmin(userId: string) {
+    return this.groupModel.find({ administradores: userId });
+  }
+
+  // ========= Participação e Controle de Membros =========
+
+  async requestJoin(groupId: string, userId: string) {
+    const group = await this.groupModel.findById(groupId);
+    if (!group) throw new NotFoundException('Grupo não encontrado');
+
+    if (group.membros.includes(userId) || group.pendentes.includes(userId)) {
+      return group; // Já é membro ou já tem solicitação pendente
+    }
+
+    group.pendentes.push(userId);
+    return group.save();
+  }
+
+  async approveMember(groupId: string, userId: string, approverId: string) {
+    const group = await this.groupModel.findById(groupId);
+    if (!group) throw new NotFoundException('Grupo não encontrado');
+
+    if (!group.administradores.includes(approverId)) {
+      throw new ForbiddenException('Apenas administradores podem aprovar membros.');
+    }
+
+    group.pendentes = group.pendentes.filter((id) => id !== userId);
+    group.membros.push(userId);
+    return group.save();
+  }
+
+  async promoteToAdmin(groupId: string, targetId: string, requesterId: string) {
+    const group = await this.groupModel.findById(groupId);
+    if (!group) throw new NotFoundException('Grupo não encontrado');
+
+    if (!group.administradores.includes(requesterId)) {
+      throw new ForbiddenException('Apenas administradores podem promover membros.');
+    }
+
+    if (!group.membros.includes(targetId)) {
+      throw new BadRequestException('Usuário não faz parte do grupo.');
+    }
+
+    if (!group.administradores.includes(targetId)) {
+      group.administradores.push(targetId);
+    }
+
+    return group.save();
+  }
+
+  async removeMember(groupId: string, userId: string, requesterId: string) {
+    const group = await this.groupModel.findById(groupId);
+    if (!group) throw new NotFoundException('Grupo não encontrado');
+
+    if (!group.administradores.includes(requesterId)) {
+      throw new ForbiddenException('Apenas administradores podem remover membros.');
+    }
+
+    const isMember = group.membros.includes(userId);
+    if (!isMember) {
+      throw new BadRequestException('Usuário não faz parte do grupo.');
+    }
+
+    group.membros = group.membros.filter((id) => id.toString() !== userId);
+    group.administradores = group.administradores.filter((id) => id.toString() !== userId);
+
+    await group.save();
+    return { message: 'Membro removido com sucesso.' };
+  }
+
+  async leaveGroup(groupId: string, userId: string) {
+    const group = await this.groupModel.findById(groupId);
+    if (!group) throw new NotFoundException('Grupo não encontrado');
+
+    const isMember = group.membros.includes(userId);
+    if (!isMember) throw new BadRequestException('Você não faz parte deste grupo.');
+
+    const isAdmin = group.administradores.includes(userId);
+
+    if (isAdmin && group.administradores.length === 1) {
+      throw new BadRequestException('Você é o único administrador. Nomeie outro antes de sair.');
+    }
+
+    group.membros = group.membros.filter((id) => id.toString() !== userId);
+    if (isAdmin) {
+      group.administradores = group.administradores.filter((id) => id.toString() !== userId);
+    }
+
+    await group.save();
+    return { message: 'Você saiu do grupo com sucesso.' };
+  }
+
+  // ========= Relatórios e Consultas =========
+
   async getFeed(groupId: string) {
-    const group = await this.model.findById(groupId)
-    if (!group) throw new Error('Grupo não encontrado')
+    const group = await this.groupModel.findById(groupId);
+    if (!group) throw new NotFoundException('Grupo não encontrado');
 
     return this.activityModel
       .find({ userId: { $in: group.membros } })
       .sort({ data: -1 })
-      .lean()
+      .lean();
   }
 
   async getGroupRankings(groupId: string) {
-    const group = await this.model.findById(groupId).lean();
+    const group = await this.groupModel.findById(groupId).lean();
 
     if (!group) throw new NotFoundException('Grupo não encontrado');
 
@@ -112,73 +188,4 @@ export class GroupService {
 
     return rankings;
   }
-
-  async findByAdmin(userId: string) {
-    return this.model.find({ administradores: userId })
-  }
-
-  async deleteGroup(id: string): Promise<{ message: string }> {
-    const result = await this.model.findByIdAndDelete(id);
-    if (!result) {
-      throw new NotFoundException('Grupo não encontrado');
-    }
-    return { message: 'Grupo excluído com sucesso' };
-  }
-
-  async removeMember(groupId: string, userId: string, requesterId: string) {
-    const grupo = await this.model.findById(groupId);
-
-    if (!grupo) throw new NotFoundException('Grupo não encontrado');
-
-    // Só admins podem remover
-    const isRequesterAdmin = grupo.administradores.includes(requesterId);
-    if (!isRequesterAdmin) {
-      throw new ForbiddenException('Apenas administradores podem remover membros.');
-    }
-
-    // Não pode remover alguém que não está no grupo
-    const isMember = grupo.membros.includes(userId);
-    if (!isMember) {
-      throw new BadRequestException('Usuário não faz parte do grupo.');
-    }
-
-    // Remove da lista de membros
-    grupo.membros = grupo.membros.filter((id) => id.toString() !== userId);
-
-    // Se por acaso for admin também, remove da lista de admins
-    grupo.administradores = grupo.administradores.filter((id) => id.toString() !== userId);
-
-    await grupo.save();
-
-    return { message: 'Membro removido com sucesso.' };
-  }
-
-  async leaveGroup(groupId: string, userId: string) {
-    const grupo = await this.model.findById(groupId);
-    if (!grupo) throw new NotFoundException('Grupo não encontrado');
-
-    const isMember = grupo.membros.includes(userId);
-    if (!isMember) throw new BadRequestException('Você não faz parte deste grupo.');
-
-    const isAdmin = grupo.administradores.includes(userId);
-
-    // Bloqueia se for o último admin
-    if (isAdmin && grupo.administradores.length === 1) {
-      throw new BadRequestException('Você é o único administrador do grupo. Nomeie outro admin antes de sair.');
-    }
-
-    // Remove da lista de membros
-    grupo.membros = grupo.membros.filter((id) => id.toString() !== userId);
-
-    // Se for admin, remove da lista de admins também
-    if (isAdmin) {
-      grupo.administradores = grupo.administradores.filter((id) => id.toString() !== userId);
-    }
-
-    await grupo.save();
-
-    return { message: 'Você saiu do grupo com sucesso.' };
-  }
-
-
 }
