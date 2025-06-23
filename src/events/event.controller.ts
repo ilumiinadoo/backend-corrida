@@ -1,7 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Req, UseGuards } from '@nestjs/common';
 import { EventService } from './event.service';
 import { CreateEventDto } from './dto/create-event.dto';
-import { UpdateEventDto } from './dto/update-event.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { Request } from 'express';
 
@@ -28,11 +27,6 @@ export class EventController {
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.eventService.findOne(id);
-  }
-
-  @Patch(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateEventDto, @Req() req: Request) {
-    return this.eventService.update(id, dto, (req.user as any)['userId']);
   }
 
   @Delete(':id')

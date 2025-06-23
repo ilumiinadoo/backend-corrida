@@ -3,9 +3,12 @@ import { Document, Types } from 'mongoose';
 import * as mongoose from 'mongoose';
 import { Group } from '../groups/group.schema';
 import { Route } from '../routes/route.schema';
+import { User } from '../users/user.schema';
+
+export type EventDocument = Event & Document;
 
 @Schema()
-export class Event extends Document {
+export class Event {
   @Prop({ required: true })
   title: string;
 
@@ -21,23 +24,27 @@ export class Event extends Document {
   @Prop()
   location?: string;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Group', required: true })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: Group.name, required: true })
   group: Types.ObjectId;
 
   @Prop({ enum: ['treino', 'corrida', 'outro'], required: true })
   tipo: 'treino' | 'corrida' | 'outro';
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Route', required: false })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: Route.name })
   rotaAssociada?: Types.ObjectId;
 
-  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: User.name, required: true })
   createdBy: Types.ObjectId;
 
   @Prop({
     type: [
       {
-        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-        status: { type: String, enum: ['confirmed', 'maybe', 'declined'], default: 'confirmed' },
+        user: { type: mongoose.Schema.Types.ObjectId, ref: User.name },
+        status: {
+          type: String,
+          enum: ['confirmed', 'maybe', 'declined'],
+          default: 'confirmed',
+        },
       },
     ],
     default: [],
@@ -46,4 +53,3 @@ export class Event extends Document {
 }
 
 export const EventSchema = SchemaFactory.createForClass(Event);
-export type EventDocument = Event & Document;
