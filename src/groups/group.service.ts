@@ -153,5 +153,32 @@ export class GroupService {
     return { message: 'Membro removido com sucesso.' };
   }
 
+  async leaveGroup(groupId: string, userId: string) {
+    const grupo = await this.model.findById(groupId);
+    if (!grupo) throw new NotFoundException('Grupo não encontrado');
+
+    const isMember = grupo.membros.includes(userId);
+    if (!isMember) throw new BadRequestException('Você não faz parte deste grupo.');
+
+    const isAdmin = grupo.administradores.includes(userId);
+
+    // Bloqueia se for o último admin
+    if (isAdmin && grupo.administradores.length === 1) {
+      throw new BadRequestException('Você é o único administrador do grupo. Nomeie outro admin antes de sair.');
+    }
+
+    // Remove da lista de membros
+    grupo.membros = grupo.membros.filter((id) => id.toString() !== userId);
+
+    // Se for admin, remove da lista de admins também
+    if (isAdmin) {
+      grupo.administradores = grupo.administradores.filter((id) => id.toString() !== userId);
+    }
+
+    await grupo.save();
+
+    return { message: 'Você saiu do grupo com sucesso.' };
+  }
+
 
 }
